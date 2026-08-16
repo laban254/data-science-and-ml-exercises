@@ -123,19 +123,30 @@ plt.rcParams['font.size'] = 12
 ## Reproducibility
 
 ### Fast/Slow Mode
-Add a configuration cell at the top:
+Use the shared `notebook_toggle.py` utility (repo root) instead of a one-off flag, so `NOTEBOOK_MODE=quick|full` behaves the same way in every notebook:
 
 ```python
-# Configuration for runs
-SMALL_RUN = True  # Set to False for full run
+import sys
+from pathlib import Path
 
-if SMALL_RUN:
-    N_SAMPLES = 100
-    N_ITERATIONS = 10
-else:
-    N_SAMPLES = 10000
-    N_ITERATIONS = 100
+# notebook_toggle.py lives at the repo root; walk up from this notebook's own
+# directory to find it, since Jupyter sets the kernel's cwd to the notebook's
+# folder, not wherever `jupyter lab` was launched from.
+try:
+    repo_root = next(p for p in Path.cwd().resolve().parents if (p / "notebook_toggle.py").exists())
+    sys.path.insert(0, str(repo_root))
+    from notebook_toggle import get_mode
+    mode = get_mode()
+except (ImportError, StopIteration):
+    # notebook_toggle.py isn't reachable (e.g. a Colab session that only
+    # fetched this one file) — fall back to a sensible default.
+    mode = "full"
+
+N_SAMPLES = 100 if mode == "quick" else 10000
+N_ITERATIONS = 10 if mode == "quick" else 100
 ```
+
+Toggle it with `export NOTEBOOK_MODE=quick` before launching Jupyter. Note that `notebook_toggle.py`'s own default is `"quick"` when `NOTEBOOK_MODE` is unset — if your notebook's whole point is demonstrating scale (e.g. a distributed-processing demo), it's fine to invert that and default to `"full"` unless quick mode is explicitly requested; just say so in a comment.
 
 ### Synthetic Data
 Use sklearn's `make_*` functions with `random_state=42`:
@@ -154,23 +165,18 @@ X, y = make_regression(n_samples=1000, n_features=10, random_state=42)
 ## Output Policy
 
 ### Before Committing
-**Clear all stored outputs** from notebooks before committing:
+**Commit notebooks with outputs rendered** — results should be readable on GitHub without anyone needing to run the notebook first.
 
-1. In Jupyter Lab: `Kernel > Restart Kernel and Run All...`
+1. In Jupyter Lab: `Kernel > Restart Kernel and Run All...` so outputs reflect the current code, top to bottom.
 2. Or use nbconvert:
    ```bash
-   jupyter nbconvert --clear-output --inplace notebook.ipynb
+   jupyter nbconvert --to notebook --execute --inplace notebook.ipynb
    ```
 
-3. Or use Jupytext for clean diffs:
-   ```bash
-   jupytext --to py:percent --clear-output notebook.ipynb
-   ```
-
-### Why Clear Outputs?
-- Cleaner git diffs
-- Smaller file sizes
-- Ensures notebooks run from scratch
+### Why Keep Outputs?
+- Results are readable on GitHub with no install or kernel required
+- Reviewers see what a change actually produced, not just the code that produces it
+- Forces the notebook to actually execute cleanly top to bottom before it's committed
 
 ---
 
@@ -179,8 +185,8 @@ X, y = make_regression(n_samples=1000, n_features=10, random_state=42)
 ### Pull Request Guidelines
 
 1. **Small, focused changes** - One topic per PR
-2. **Test your notebook** - Run all cells before submitting
-3. **Clear outputs** - Remove all stored outputs
+2. **Test your notebook** - Restart the kernel and run all cells before submitting
+3. **Keep outputs rendered** - Commit with fresh outputs from that full run, not stale or cleared ones
 4. **Descriptive commits** - Explain what changed
 
 ### PR Title Format

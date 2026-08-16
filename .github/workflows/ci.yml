@@ -32,9 +32,8 @@ jobs:
       - name: Smoke-test core notebooks
         run: |
           # Execute every notebook the lightweight core stack supports, top to
-          # bottom, failing the build if any cell raises. The deep-learning /
-          # MLOps notebooks need requirements-deep.txt (torch, tensorflow,
-          # pyspark, mlflow, GPU) and are intentionally excluded here.
+          # bottom, failing the build if any cell raises. The notebooks needing
+          # requirements-deep.txt run in the smoke-test-deep job below.
           find . -name "*.ipynb" \
             -not -path "*/.ipynb_checkpoints/*" \
             -not -path "*/.venv/*" \
@@ -45,3 +44,63 @@ jobs:
             -print0 \
           | xargs -0 -I {} jupyter nbconvert --to notebook --execute \
               --ExecutePreprocessor.timeout=300 --stdout {} > /dev/null
+
+      - name: Check notebooks left no untracked artifacts
+        run: |
+          # A notebook that writes a file must gitignore it, so a clean checkout
+          # stays clean after a full run. See docs/DEVELOPMENT.md.
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Notebook run left artifacts in the working tree:"
+            git status --porcelain
+            exit 1
+          fi
+
+  smoke-test-deep:
+    name: Execute deep-learning & MLOps notebooks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install core + deep dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-deep.txt
+          pip install nbconvert
+
+      - name: Smoke-test deep notebooks
+        run: |
+          # torch, tensorflow, pyspark and mlflow all run CPU-only here — no GPU
+          # needed. 05_sre_applications/llm_finetuning is excluded because it
+          # downloads a model from HuggingFace on a cold cache, which pushes it
+          # well past ten minutes.
+          find . -name "*.ipynb" \
+            -not -path "*/.ipynb_checkpoints/*" \
+            -not -path "*/.venv/*" \
+            \( -path "./04_deep_learning/*" \
+               -o -path "./05_sre_applications/mlops_tracking/*" \
+               -o -path "./01_foundations/distributed_data/*" \) \
+            -print0 \
+          | xargs -0 -I {} jupyter nbconvert --to notebook --execute \
+              --ExecutePreprocessor.timeout=900 --stdout {} > /dev/null
+
+      - name: Check notebooks left no untracked artifacts
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Notebook run left artifacts in the working tree:"
+            git status --porcelain
+            exit 1
+          fi

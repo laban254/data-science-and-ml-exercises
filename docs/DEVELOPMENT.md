@@ -47,8 +47,8 @@ python notebook_toggle.py --mode full  # Set full mode
 - **Seeds**: Always use `random_state=42` or `np.random.seed(42)` for reproducibility
 - **Notebook naming**: lowercase with hyphens (e.g., `numpy.ipynb`, `classification-exercise.ipynb`)
 - **Each topic directory** (numpy/, pandas/, etc.) has its own `requirements.txt`
-- **Output files** (like `output.csv`) are gitignored per directory - check each topic's `.gitignore`
-- **Clear outputs** before committing notebooks (cleaner diffs, smaller files)
+- **Output files** written by a notebook (e.g. `server_metrics.json`, `log-parser-lora/`) must be gitignored — add them to that topic's own `.gitignore`, or to the root one if the pattern is repo-wide. Run a notebook and check `git status` is clean before committing.
+- **Commit notebooks with outputs rendered** so results are readable on GitHub without running anything
 - **Quick/Full mode**: Use `DATA_MODE` env var, `--quick/--full` flags, or `notebook_toggle.py`
 
 ## Quick/Full Mode System
